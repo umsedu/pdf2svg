@@ -90,17 +90,22 @@ int main(int argn, char *args[])
     g_type_init ();
 
     // Get command line arguments
-    if ((argn < 3)||(argn > 4) || !g_str_has_suffix(args[2], ".svg") || !g_str_has_suffix(args[1], ".pdf")) {
-        printf("Usage: pdf2svg <in file.pdf> <out file.svg> [<page no> | all | split]\n");
-        printf("luogu style example: pdf2svg input.pdf output.svg split\n");
-        printf("generates output_1.svg to output_30.svg in case pdf has 30pages.\n");
+    if ((argn < 3)||(argn > 4) || !g_str_has_suffix(args[1], ".pdf")) {
+        printf("Usage: pdf2svg <in file.pdf> [<out file.svg>] [<page no> | all | split | luogu]\n");
+        printf("luogu style example: pdf2svg input.pdf luogu\n");
+        printf("generates 1.svg to <page count>.svg.\n");
         return -2;
     }
     gchar *absoluteFileName = getAbsoluteFileName(args[1]);
     gchar *filename_uri = g_filename_to_uri(absoluteFileName, NULL, NULL);
     gchar *pageLabel = NULL;
 
-    char* svgFilename = args[2];
+    char* svgFilename = NULL;
+    if (strcmp(args[2], "luogu") == 0) {
+        pageLabel = g_strdup(args[2]);
+    } else {
+        svgFilename = args[2];
+    }
 
     g_free(absoluteFileName);
     if (argn == 4) {
@@ -173,13 +178,34 @@ int main(int argn, char *args[])
                 gchar *pageItLabel = g_strdup_printf("%d", pageIt);
                 gchar *svgItName = g_strdup_printf("%s_%d.svg", svgFilePrefix, pageIt);
 
-                page = poppler_document_get_page_by_label(pdffile, pageItLabel);
+                page = poppler_document_get_page(pdffile, pageIt - 1);
                 curError = convertPage(page, svgItName);
 
                 g_free(pageItLabel);
                 g_free(svgItName);
             }
             g_free(svgFilePrefix);
+            g_free(pageLabel);
+        }
+        else if (strcmp(pageLabel, "luogu") == 0) {
+            int pageCount = poppler_document_get_n_pages(pdffile);
+
+            if(pageCount > 9999999) {
+                fprintf(stderr, "Too many pages (>9,999,999)\n");
+                return -5;
+            }
+
+            int pageIt, curError;
+            for (pageIt = 1; pageIt <= pageCount; pageIt++) {
+                gchar *pageItLabel = g_strdup_printf("%d", pageIt);
+                gchar *svgItName = g_strdup_printf("%d.svg", pageIt);
+
+                page = poppler_document_get_page(pdffile, pageIt - 1);
+                curError = convertPage(page, svgItName);
+
+                g_free(pageItLabel);
+                g_free(svgItName);
+            }
             g_free(pageLabel);
         }
         else {
